@@ -109,15 +109,6 @@ def get_line_coords(cx, cy, length, angle):
 def draw_orientations(image, mask, angles, block_size=16):
     """
     Draw orientation lines on a blank RGB canvas using the orientation field.
-
-    Args:
-        image (ndarray): Grayscale input image.
-        mask (ndarray): Binary mask defining valid fingerprint region.
-        angles (ndarray): Block orientation angles.
-        block_size (int): Block size used for orientation estimation.
-
-    Returns:
-        ndarray: RGB image with orientation lines.
     """
     height, width = image.shape
     overlay = np.zeros((height, width, 3), dtype=np.uint8)

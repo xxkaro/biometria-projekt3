@@ -4,7 +4,8 @@ import numpy as np
 from processing_functions.normalization import normalize_image
 from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
-
+from processing_functions.filtering import apply_gabor_filters
+from processing_functions.skeletonization import morphological_skeleton
 
 
 class FingerprintProcessor:
@@ -20,7 +21,6 @@ class FingerprintProcessor:
         self.filtered_image = None        # Final Gabor filtered image or enhanced image
 
     def load_image(self, filepath):
-        from PIL import Image
         self.raw_image = np.array(Image.open(filepath).convert('L'))
         print(f"Loaded image {filepath} with shape {self.raw_image.shape}")
         # Reset dependent images
@@ -34,7 +34,6 @@ class FingerprintProcessor:
         self.filtered_image = None
 
     def display_image(self, image=None, title="Image"):
-        import matplotlib.pyplot as plt
         if image is None:
             # Default display raw_image if nothing passed
             if self.raw_image is not None:
@@ -122,4 +121,26 @@ class FingerprintProcessor:
         print(f"Median frequency: {median_freq}")
         self.display_image(freq_map, title="Frequency Map")
 
+    def apply_gabor_filter(self, default_frequency=None):
+        if self.segmented_image is None or self.roi_mask is None or self.orientations is None or self.freq_map is None:
+            print("Complete previous steps first")
+            return
+        self.filtered_image = apply_gabor_filters(
+            self.segmented_image,
+            self.orientations,
+            self.freq_map,
+            self.roi_mask,
+            block_size=16,
+            default_frequency=default_frequency
+        )
+        print("Gabor filter applied")
+        self.display_image(self.filtered_image, title="Filtered Image")
+    
+    def morphological_skeletonization(self):
+        if self.filtered_image is None:
+            print("Apply Gabor filter first")
+            return
+        skeleton = morphological_skeleton(self.filtered_image)
+        self.display_image(skeleton, title="Morphological Skeleton")
+        print("Morphological skeletonization completed")
     

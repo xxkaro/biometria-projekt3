@@ -15,7 +15,7 @@ def normalize_image(img):
     """Normalize image to zero mean and unit variance."""
     return (img - np.mean(img)) / np.std(img)
 
-def perform_segmentation(img, block_size=16, threshold_ratio=0.2):
+def perform_segmentation(img, block_size=16, threshold_ratio=0.35):
     """
     Segments the image into regions of interest based on local variance,
     and returns the segmented image, normalized image, and the ROI mask.
