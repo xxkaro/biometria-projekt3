@@ -5,7 +5,7 @@ from processing_functions.normalization import normalize_image
 from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
 from processing_functions.filtering import apply_gabor_filters
-from processing_functions.skeletonization import morphological_skeleton
+from processing_functions.skeletonization import morphological_skeleton, thinning_with_masks
 
 
 class FingerprintProcessor:
@@ -144,3 +144,10 @@ class FingerprintProcessor:
         self.display_image(skeleton, title="Morphological Skeleton")
         print("Morphological skeletonization completed")
     
+    def thining_with_masks(self, max_iter=100):
+        if self.filtered_image is None:
+            print("Apply Gabor filter first")
+            return
+        skeleton = thinning_with_masks(self.filtered_image, max_iter=max_iter)
+        self.display_image(skeleton, title="Thinned Skeleton")
+        print("Thinning with masks completed")
