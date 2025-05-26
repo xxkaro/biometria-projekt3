@@ -1,11 +1,12 @@
 from PIL import Image
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from processing_functions.normalization import normalize_image
 from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
 from processing_functions.filtering import apply_gabor_filters
-from processing_functions.skeletonization import morphological_skeleton, thinning_with_masks
+from processing_functions.skeletonization import morphological_skeleton, thinning_with_masks, kmm_skeletonize
 from processing_functions.minutiae import detect_minutiae, visualize_minutiae
 
 
@@ -37,13 +38,17 @@ class FingerprintProcessor:
 
     def display_image(self, image=None, title="Image"):
         if image is None:
-            # Default display raw_image if nothing passed
-            if self.raw_image is not None:
-                image = self.raw_image
-            else:
+            image = self.raw_image
+            if image is None:
                 print("No image to display")
                 return
-        plt.imshow(image, cmap='gray')
+
+        # For display: invert if foreground is white
+        display_img = image.copy()
+        if np.mean(display_img) < 127:
+            display_img = cv2.bitwise_not(display_img)
+
+        plt.imshow(display_img, cmap='gray')
         plt.title(title)
         plt.axis('off')
         plt.show()
@@ -137,22 +142,50 @@ class FingerprintProcessor:
         )
         print("Gabor filter applied")
         self.display_image(self.filtered_image, title="Filtered Image")
+        return self.filtered_image
     
     def morphological_skeletonization(self):
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
         self.skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask)
+
+        # Convert all non-zero pixels to 255 (foreground/ridges)
+        self.skeleton = np.where(self.skeleton > 0, 255, 0).astype(np.uint8)
+
+        # Ensure correct polarity: black background, white ridges
+        # If background is incorrectly white, invert
+        if np.sum(self.skeleton == 255) < np.sum(self.skeleton == 0):
+            self.skeleton = cv2.bitwise_not(self.skeleton)
+
+        # Remove small artifacts
+        kernel = np.ones((3, 3), np.uint8)
+        self.skeleton = cv2.morphologyEx(self.skeleton, cv2.MORPH_OPEN, kernel)
+        self.skeleton = cv2.bitwise_not(self.skeleton)
+        self.save_image(self.skeleton, "morph_skeleton.bmp")
         self.display_image(self.skeleton, title="Morphological Skeleton")
         print("Morphological skeletonization completed")
-    
+
+
+    def skeletonize_with_kmm(self):
+        if self.filtered_image is None:
+            print("Apply Gabor filter first")
+            return
+        self.skeleton = kmm_skeletonize(self.filtered_image)
+        self.skeleton = np.where(self.skeleton > 0, 255, 0).astype(np.uint8)
+        self.save_image(self.skeleton, "kmm_skeleton.bmp")
+        self.display_image(self.skeleton, title="KMM Skeleton")
+        print("KMM skeletonization completed")
+        
     def thining_with_masks(self, max_iter=100):
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
         skeleton = thinning_with_masks(self.filtered_image, max_iter=max_iter)
-        self.display_image(skeleton, title="Thinned Skeleton")
+        self.skeleton = skeleton
+        self.display_image(self.skeleton, title="Thinned Skeleton")
         print("Thinning with masks completed")
+
     
     def detect_minutiae(self):
         if self.skeleton is None:
