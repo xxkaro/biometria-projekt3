@@ -3,13 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-def morphological_skeleton(image, element_shape=cv2.MORPH_CROSS):
+def morphological_skeleton(image, mask=None, element_shape=cv2.MORPH_CROSS):
     """
-    Perform morphological skeletonization on a binary image.
+    Perform morphological skeletonization on a binary image, optionally within a masked region.
     """
     _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
     image = (image > 0).astype(np.uint8)
+
+    if mask is not None:
+        image = cv2.bitwise_and(image, mask.astype(np.uint8))
+
     element = cv2.getStructuringElement(element_shape, (3, 3))
     skeleton = np.zeros_like(image)
     k = 0
@@ -27,8 +30,9 @@ def morphological_skeleton(image, element_shape=cv2.MORPH_CROSS):
         skeleton = cv2.bitwise_or(skeleton, sk)
         k += 1
 
-    skeleton = cv.bitwise_not(skeleton)
+    skeleton = cv2.bitwise_not(skeleton)
     return skeleton
+
 
 
 def thinning_with_masks(image, max_iter=100):
@@ -86,4 +90,4 @@ def thinning_with_masks(image, max_iter=100):
                 changed = True
         iter_count += 1
 
-    return cv2.bitwise_not(image * 255)
+    return cv2.bitwise_not(image)

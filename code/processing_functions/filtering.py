@@ -64,7 +64,7 @@ def apply_gabor_filters(image, orientation, frequency_map, mask,
             if kernel_block.shape != (block_size, block_size):
                 kernel_block = kernel_block[:block_size, :block_size]
 
-            filtered_block = cv.filter2D(block, -1, kernel_block)
+            filtered_block = filtered_block = cv.filter2D(block, -1, kernel_block, borderType=cv.BORDER_REPLICATE)
             filtered[r:r + block_size, c:c + block_size] = filtered_block
 
     # filtered_norm = cv.normalize(filtered, None, 0, 255, norm_type=cv.NORM_MINMAX)
@@ -76,6 +76,5 @@ def apply_gabor_filters(image, orientation, frequency_map, mask,
 
     # Binarizacja: linie papilarne stają się czarne (0), tło białe (255)
     _, binary = cv.threshold(filtered_norm, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-    binary = cv.bitwise_not(binary)
 
-    return binary
+    return cv.bitwise_not(binary)

@@ -140,7 +140,7 @@ class FingerprintProcessor:
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
-        skeleton = morphological_skeleton(self.filtered_image)
+        skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask)
         self.display_image(skeleton, title="Morphological Skeleton")
         print("Morphological skeletonization completed")
     
