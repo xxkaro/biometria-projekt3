@@ -30,12 +30,14 @@ def morphological_skeleton(image, mask=None, element_shape=cv2.MORPH_CROSS):
         skeleton = cv2.bitwise_or(skeleton, sk)
         k += 1
 
+    
+    skeleton = skeleton * 255 
     skeleton = cv2.bitwise_not(skeleton)
     return skeleton
 
 
 
-def thinning_with_masks(image, max_iter=100):
+def thinning_with_masks(image, max_iter=1000):
     """
     Perform thinning of a binary image using hit-or-miss transforms with predefined masks.
     """

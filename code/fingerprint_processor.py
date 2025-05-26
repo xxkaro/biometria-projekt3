@@ -6,6 +6,7 @@ from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
 from processing_functions.filtering import apply_gabor_filters
 from processing_functions.skeletonization import morphological_skeleton, thinning_with_masks
+from processing_functions.minutiae import detect_minutiae, visualize_minutiae
 
 
 class FingerprintProcessor:
@@ -19,6 +20,7 @@ class FingerprintProcessor:
         self.median_freq = None           # Median frequency value
         self.directional_map = None       # Directional map visualization
         self.filtered_image = None        # Final Gabor filtered image or enhanced image
+        self.skeleton = None             # Skeletonized image after Gabor filtering
 
     def load_image(self, filepath):
         self.raw_image = np.array(Image.open(filepath).convert('L'))
@@ -140,8 +142,8 @@ class FingerprintProcessor:
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
-        skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask)
-        self.display_image(skeleton, title="Morphological Skeleton")
+        self.skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask)
+        self.display_image(self.skeleton, title="Morphological Skeleton")
         print("Morphological skeletonization completed")
     
     def thining_with_masks(self, max_iter=100):
@@ -151,3 +153,12 @@ class FingerprintProcessor:
         skeleton = thinning_with_masks(self.filtered_image, max_iter=max_iter)
         self.display_image(skeleton, title="Thinned Skeleton")
         print("Thinning with masks completed")
+    
+    def detect_minutiae(self):
+        if self.skeleton is None:
+            print("Skeletonize the image first")
+            return
+        endings, bifurcations = detect_minutiae(self.skeleton)
+        print(f"Detected {len(endings)} endings and {len(bifurcations)} bifurcations")
+        vis_image = visualize_minutiae(self.skeleton, endings, bifurcations)
+        self.display_image(vis_image, title="Minutiae Detection")
