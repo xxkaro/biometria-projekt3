@@ -9,7 +9,7 @@ def detect_minutiae(skeleton):
     endings = []
     bifurcations = []
 
-    skeleton = (skeleton == 0).astype(np.uint8)
+    skeleton = (skeleton == 255).astype(np.uint8)
 
     rows, cols = skeleton.shape
 
