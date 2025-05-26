@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import scipy.ndimage
+import matplotlib.pyplot as plt
 
 def apply_gabor_filters(image, orientation, frequency_map, mask,
                                        block_size=16, default_frequency=None,
@@ -66,5 +67,15 @@ def apply_gabor_filters(image, orientation, frequency_map, mask,
             filtered_block = cv.filter2D(block, -1, kernel_block)
             filtered[r:r + block_size, c:c + block_size] = filtered_block
 
+    # filtered_norm = cv.normalize(filtered, None, 0, 255, norm_type=cv.NORM_MINMAX)
+    # return filtered_norm.astype(np.uint8)
+
     filtered_norm = cv.normalize(filtered, None, 0, 255, norm_type=cv.NORM_MINMAX)
-    return filtered_norm.astype(np.uint8)
+    filtered_norm = filtered_norm.astype(np.uint8)
+
+
+    # Binarizacja: linie papilarne stają się czarne (0), tło białe (255)
+    _, binary = cv.threshold(filtered_norm, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    binary = cv.bitwise_not(binary)
+
+    return binary

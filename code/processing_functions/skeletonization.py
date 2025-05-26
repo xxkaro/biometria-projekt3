@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2 as cv
 
 def morphological_skeleton(image, element_shape=cv2.MORPH_CROSS):
     """
@@ -26,4 +27,5 @@ def morphological_skeleton(image, element_shape=cv2.MORPH_CROSS):
         skeleton = cv2.bitwise_or(skeleton, sk)
         k += 1
 
+    skeleton = cv.bitwise_not(skeleton)
     return skeleton
