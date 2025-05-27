@@ -47,7 +47,7 @@ class FingerprintProcessor:
         display_img = image.copy()
         if np.mean(display_img) < 127:
             display_img = cv2.bitwise_not(display_img)
-
+        plt.figure(figsize=(10, 10))
         plt.imshow(display_img, cmap='gray')
         plt.title(title)
         plt.axis('off')
@@ -142,6 +142,9 @@ class FingerprintProcessor:
         )
         print("Gabor filter applied")
         self.display_image(self.filtered_image, title="Filtered Image")
+        #save the filtered image as a BMP file
+        self.save_image(self.filtered_image, "filtered_image.bmp")
+        print("Filtered image saved as filtered_image.bmp")
         return self.filtered_image
     
     def morphological_skeletonization(self):
