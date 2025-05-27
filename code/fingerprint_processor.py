@@ -6,7 +6,7 @@ from processing_functions.normalization import normalize_image
 from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
 from processing_functions.filtering import apply_gabor_filters
-from processing_functions.skeletonization import morphological_skeleton, thinning_with_masks, kmm_skeletonize
+from processing_functions.skeletonization import morphological_skeleton, kmm_skeletonize
 from processing_functions.minutiae import detect_minutiae, visualize_minutiae
 
 
@@ -144,28 +144,20 @@ class FingerprintProcessor:
         )
         print("Gabor filter applied")
         self.display_image(self.filtered_image, title="Filtered Image")
-        #save the filtered image as a BMP file
         self.save_image(self.filtered_image, "filtered_image.bmp")
-        print("Filtered image saved as filtered_image.bmp")
         return self.filtered_image
     
     def morphological_skeletonization(self):
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
-        self.skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask)
+        self.skeleton = morphological_skeleton(self.filtered_image, mask=self.roi_mask, element_shape=cv2.MORPH_CROSS)
 
-        # Convert all non-zero pixels to 255 (foreground/ridges)
         self.skeleton = np.where(self.skeleton > 0, 255, 0).astype(np.uint8)
 
-        # Ensure correct polarity: black background, white ridges
-        # If background is incorrectly white, invert
         if np.sum(self.skeleton == 255) < np.sum(self.skeleton == 0):
             self.skeleton = cv2.bitwise_not(self.skeleton)
 
-        # Remove small artifacts
-        kernel = np.ones((3, 3), np.uint8)
-        self.skeleton = cv2.morphologyEx(self.skeleton, cv2.MORPH_OPEN, kernel)
         self.skeleton = cv2.bitwise_not(self.skeleton)
         self.save_image(self.skeleton, "morph_skeleton.bmp")
         self.display_image(self.skeleton, title="Morphological Skeleton")
@@ -181,15 +173,14 @@ class FingerprintProcessor:
         self.save_image(self.skeleton, "kmm_skeleton.bmp")
         self.display_image(self.skeleton, title="KMM Skeleton")
         print("KMM skeletonization completed")
-        
-    def thining_with_masks(self, max_iter=100):
-        if self.filtered_image is None:
-            print("Apply Gabor filter first")
-            return
-        skeleton = thinning_with_masks(self.filtered_image, max_iter=max_iter)
-        self.skeleton = skeleton
-        self.display_image(self.skeleton, title="Thinned Skeleton")
-        print("Thinning with masks completed")
+
+    def skeletonize(self, method='morphological'):
+        if method == 'morphological':
+            self.morphological_skeletonization()
+        elif method == 'kmm':
+            self.skeletonize_with_kmm()
+        else:
+            print("Unknown skeletonization method. Use 'morphological' or 'kmm'.")
 
     
     def detect_minutiae(self):
@@ -199,4 +190,19 @@ class FingerprintProcessor:
         endings, bifurcations = detect_minutiae(self.skeleton)
         print(f"Detected {len(endings)} endings and {len(bifurcations)} bifurcations")
         vis_image = visualize_minutiae(self.skeleton, endings, bifurcations)
-        self.display_image(vis_image, title="Minutiae Detection")
+
+    def process_fingerprint(self, filepath, normalize=True, segment=True, directional_map=True,
+                          frequency_map=True, gabor_filter=True, skeletonize_method='morphological'):
+        self.load_image(filepath)
+        if normalize:
+            self.normalize_fingerprint()
+        if segment:
+            self.fingerprint_segmentation()
+        if directional_map:
+            self.create_directional_map()
+        if frequency_map:
+            self.frequency_map()
+        if gabor_filter:
+            self.apply_gabor_filter()
+        self.skeletonize(method=skeletonize_method)
+        self.detect_minutiae()
