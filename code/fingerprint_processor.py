@@ -88,6 +88,7 @@ class FingerprintProcessor:
             return
         self.normalized_image = normalize_image(self.raw_image, target_mean, target_variance)
         print("Fingerprint normalized")
+        self.display_image(self.normalized_image, title="Normalized Image")
 
     def fingerprint_segmentation(self):
         if self.normalized_image is None:
@@ -98,6 +99,7 @@ class FingerprintProcessor:
         self.normalized_image = norm_img     # Use normalized image after segmentation as base for next steps
         self.roi_mask = mask
         print("Fingerprint segmented")
+        self.display_image(seg_img, title="Segmented Image")
 
     def create_directional_map(self):
         if self.segmented_image is None or self.roi_mask is None:
