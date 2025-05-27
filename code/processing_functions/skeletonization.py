@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from collections import deque
 
 def morphological_skeleton(image, mask=None, element_shape=cv2.MORPH_CROSS):
     """
@@ -94,22 +95,41 @@ def thinning_with_masks(image, max_iter=1000):
 
     return image
 
-import numpy as np
-import cv2
 
-# Helper: Get 8-neighbour coordinates
-def get_neighbours(x, y, shape):
-    h, w = shape
-    neighbours = [
-        (x - 1, y - 1), (x - 1, y), (x - 1, y + 1),
-        (x,     y - 1),           (x,     y + 1),
-        (x + 1, y - 1), (x + 1, y), (x + 1, y + 1)
-    ]
-    return [(i, j) for i, j in neighbours if 0 <= i < h and 0 <= j < w]
+# Returns 4-connected neighbors
+def get_4_neighbours(x, y, shape):
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < shape[0] and 0 <= ny < shape[1]:
+            yield (nx, ny)
 
-# Helper: Get stick neighbours (1-value neighbours)
-def get_stick_neighbours(img, x, y):
-    return sum(img[nx, ny] != 0 for nx, ny in get_neighbours(x, y, img.shape))
+# Returns 8-connected neighbors
+def get_8_neighbours(x, y, shape):
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            if dx == 0 and dy == 0:
+                continue
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < shape[0] and 0 <= ny < shape[1]:
+                yield (nx, ny)
+
+# Check if all active neighbors are 4-connected (stick to each other)
+def are_neighbors_4_connected(img, neighbors):
+    if not neighbors:
+        return False
+    visited = set()
+    queue = deque([neighbors[0]])
+    visited.add(neighbors[0])
+
+    while queue:
+        cx, cy = queue.popleft()
+        for nx, ny in get_4_neighbours(cx, cy, img.shape):
+            if (nx, ny) in neighbors and (nx, ny) not in visited:
+                visited.add((nx, ny))
+                queue.append((nx, ny))
+
+    return visited == set(neighbors)
+
 
 # Helper: Compute weight using matrix ((128,1,2),(64,x,4),(32,16,8))
 def get_weight(img, x, y):
@@ -141,64 +161,113 @@ removal_weights = set([
     244, 245, 246, 247, 248, 249, 251, 252, 253, 254, 255
 ])
 
-def kmm_skeletonize(bitmap):
+def run_single_pass(bitmap, visualize=True):
     img = bitmap.copy()
 
-    # Step 1-2: Normalize input so that foreground = 1, background = 0
     if img.dtype != np.uint8:
         img = img.astype(np.uint8)
 
     if np.max(img) > 1:  # likely 0-255 range
         _, img = cv2.threshold(img, 127, 1, cv2.THRESH_BINARY_INV)
 
-    # Step 2: Mark all 1s (already done if input is binary with foreground 1)
     img[img != 0] = 1
+    if visualize:
+        visualize_step(img, "Step 2: Normalized Binary Image")
 
-    # Step 3 & 4: Edge and corner detection
     for x in range(img.shape[0]):
         for y in range(img.shape[1]):
             if img[x, y] == 1:
-                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    if 0 <= x + dx < img.shape[0] and 0 <= y + dy < img.shape[1]:
-                        if img[x + dx, y + dy] == 0:
-                            img[x, y] = 2
-                for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-                    if 0 <= x + dx < img.shape[0] and 0 <= y + dy < img.shape[1]:
-                        if img[x + dx, y + dy] == 0:
-                            if img[x, y] != 2:
-                                img[x, y] = 3
+                is_edge_neighbor = any(
+                    0 <= x + dx < img.shape[0] and 0 <= y + dy < img.shape[1] and img[x + dx, y + dy] == 0
+                    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                )
+                if is_edge_neighbor:
+                    img[x, y] = 2
+                else:
+                    is_corner_neighbor = any(
+                        0 <= x + dx < img.shape[0] and 0 <= y + dy < img.shape[1] and img[x + dx, y + dy] == 0
+                        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+                    )
+                    if is_corner_neighbor:
+                        img[x, y] = 3
+    if visualize:
+        visualize_step(img, "Step 4: After Edge and Corner Detection")
 
-    # Step 5: Mark 2/3 with 2-4 neighbours as 4
     for x in range(img.shape[0]):
         for y in range(img.shape[1]):
             if img[x, y] in [2, 3]:
-                sticks = get_stick_neighbours(img, x, y)
-                if 2 <= sticks <= 4:
+                neighbors = [(nx, ny) for nx, ny in get_8_neighbours(x, y, img.shape) if img[nx, ny] != 0]
+                if 2 <= len(neighbors) <= 4 and are_neighbors_4_connected(img, neighbors):
                     img[x, y] = 4
+    if visualize:
+        visualize_step(img, "Step 5: Marked for Removal (Label 4)")
 
-    # Step 6: Remove all 4s
     img[img == 4] = 0
+    if visualize:
+        visualize_step(img, "Step 6: Removed Pixels Marked as 4")
 
-    # Step 7: Initialize
     N = 2
-    i_max = img.size
+    iter_count = 0
 
-    # Step 8+: Main iterative thinning
     while True:
         changed = False
-        flat_img = img.flatten()
-        for i in range(i_max):
-            x, y = divmod(i, img.shape[1])
-            if flat_img[i] == N:
-                weight = get_weight(img, x, y)
-                if weight in removal_weights:
-                    flat_img[i] = 0
-                    changed = True
-                else:
-                    flat_img[i] = 1
-        img = flat_img.reshape(img.shape)
+
+        for x in range(img.shape[0]):
+            for y in range(img.shape[1]):
+                if img[x, y] == N:
+                    weight = get_weight(img, x, y)
+                    if weight in removal_weights:
+                        img[x, y] = 0
+                        changed = True
+                    else:
+                        img[x, y] = 1
+
+        if visualize:
+            visualize_step(img, f"Step 8+: Iteration {iter_count}, Label {N}")
+        iter_count += 1
+
         if N == 3 or not changed:
             break
         N = 3
 
     return img
+
+
+
+def visualize_step(img, title):
+    color_map = {
+        0: [255, 255, 255],  # white
+        1: [0, 0, 0],        # black
+        2: [255, 255, 0],    # yellow
+        3: [255, 0, 0],      # red
+        4: [0, 255, 0],      # green
+    }
+
+    color_img = np.zeros((*img.shape, 3), dtype=np.uint8)
+    for val, color in color_map.items():
+        color_img[img == val] = color
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(color_img)
+    plt.axis('off')
+    plt.grid(False)
+    plt.show()
+    
+
+def kmm_skeletonize(bitmap):
+    current_img = bitmap.copy()
+    last_changed_img = current_img.copy()
+    first_iteration = True
+
+    while True:
+        next_img = run_single_pass(current_img, visualize=first_iteration)
+        first_iteration = False  # Only visualize the first iteration
+
+        if np.array_equal(current_img, next_img):
+            break
+
+        last_changed_img = current_img
+        current_img = next_img
+
+    return last_changed_img
+
