@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 def detect_minutiae(skeleton):
     """
@@ -27,15 +28,21 @@ def detect_minutiae(skeleton):
     return endings, bifurcations
 
 
-
 def visualize_minutiae(skeleton, endings, bifurcations):
+    skeleton = cv2.bitwise_not(skeleton)  # odwrócenie kolorów
     vis_image = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2BGR)
 
     for (x, y) in endings:
-        cv2.circle(vis_image, (x, y), radius=1, color=(0, 0, 255), thickness=-1) 
+        cv2.circle(vis_image, (x, y), radius=1, color=(0, 0, 255), thickness=-1)
 
     for (x, y) in bifurcations:
-        cv2.circle(vis_image, (x, y), radius=1, color=(0, 255, 0), thickness=-1) 
-    
+        cv2.circle(vis_image, (x, y), radius=1, color=(0, 255, 0), thickness=-1)
 
-    return vis_image
+    # Konwersja BGR -> RGB do poprawnego wyświetlenia w matplotlib
+    vis_rgb = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
+
+    plt.figure(figsize=(8, 8))
+    plt.imshow(vis_rgb)
+    plt.axis('off')
+    plt.title("Minutiae Detection")
+    plt.show()
