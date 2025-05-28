@@ -7,10 +7,11 @@ from processing_functions.segmentation import perform_segmentation
 from processing_functions.mapping import compute_orientations, draw_orientations, estimate_ridge_frequency
 from processing_functions.filtering import apply_gabor_filters
 from processing_functions.skeletonization import morphological_skeleton, kmm_skeletonize
-from processing_functions.minutiae import detect_minutiae, visualize_minutiae
+from processing_functions.minutiae import detect_minutiae, visualize_minutiae, detect_minutiae_with_directions, visualize_minutiae_with_directions
 
 
 class FingerprintProcessor:
+    
     def __init__(self):
         self.raw_image = None             # Original loaded image
         self.normalized_image = None      # Normalized image (illumination, contrast adjusted)
@@ -164,11 +165,11 @@ class FingerprintProcessor:
         print("Morphological skeletonization completed")
 
 
-    def skeletonize_with_kmm(self):
+    def skeletonize_with_kmm(self, visualize=True):
         if self.filtered_image is None:
             print("Apply Gabor filter first")
             return
-        self.skeleton = kmm_skeletonize(self.filtered_image)
+        self.skeleton = kmm_skeletonize(self.filtered_image, visualize=visualize)
         self.skeleton = np.where(self.skeleton > 0, 255, 0).astype(np.uint8)
         self.save_image(self.skeleton, "kmm_skeleton.bmp")
         self.display_image(self.skeleton, title="KMM Skeleton")
@@ -190,6 +191,16 @@ class FingerprintProcessor:
         endings, bifurcations = detect_minutiae(self.skeleton)
         print(f"Detected {len(endings)} endings and {len(bifurcations)} bifurcations")
         vis_image = visualize_minutiae(self.skeleton, endings, bifurcations)
+
+    def detect_minutiae_with_directions(self):
+        if self.skeleton is None:
+            print("Skeletonize the image first")
+            return
+
+        endings, bifurcations = detect_minutiae_with_directions(self.skeleton)
+        print(f"Detected {len(endings)} endings and {len(bifurcations)} bifurcations with directions")
+        visualize_minutiae_with_directions(self.skeleton, endings, bifurcations)
+
 
     def process_fingerprint(self, filepath, normalize=True, segment=True, directional_map=True,
                           frequency_map=True, gabor_filter=True, skeletonize_method='morphological'):
