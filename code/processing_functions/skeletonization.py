@@ -194,10 +194,10 @@ def visualize_step(img, title):
     plt.show()
     
 
-def kmm_skeletonize(bitmap):
+def kmm_skeletonize(bitmap, visualize = True):
     current_img = bitmap.copy()
     last_changed_img = current_img.copy()
-    first_iteration = True
+    first_iteration = visualize
 
     while True:
         next_img = run_single_pass(current_img, visualize=first_iteration)
